@@ -11,11 +11,12 @@ enum Direction {
 
 fn part_1(input: &str) -> i32 {
     let mut position = (0, 0);
-    let mut direction = Direction::North;
+    let mut current_direction = Direction::North;
 
     input.split(", ").for_each(|instruction| {
-        let steps = turn_and_return_steps(instruction, &mut direction);
-        move_towards(direction, steps, &mut position);
+        let (direction, steps) = parse_instruction(instruction, current_direction);
+        current_direction = direction;
+        move_towards(current_direction, steps, &mut position);
     });
 
     position.0.abs() + position.1.abs()
@@ -23,28 +24,39 @@ fn part_1(input: &str) -> i32 {
 
 fn part_2(input: &str) -> i32 {
     let mut position = (0, 0);
-    let mut direction = Direction::North;
+    let mut current_direction = Direction::North;
     let mut visited_locations = HashSet::new();
 
     input.split(", ").find(|instruction| {
-        let steps = turn_and_return_steps(instruction, &mut direction);
-        move_until_location_visited_twice(direction, steps, &mut position, &mut visited_locations)
+        let (direction, steps) = parse_instruction(instruction, current_direction);
+        current_direction = direction;
+        move_until_location_visited_twice(
+            current_direction,
+            steps,
+            &mut position,
+            &mut visited_locations,
+        )
     });
 
     position.0.abs() + position.1.abs()
 }
 
-fn turn_and_return_steps(instruction: &str, direction: &mut Direction) -> i32 {
-    if instruction.contains('L') {
-        *direction = turn_left(*direction);
+fn parse_instruction(instruction: &str, direction: Direction) -> (Direction, i32) {
+    let direction = if instruction.contains('L') {
+        turn_left(direction)
     } else if instruction.contains('R') {
-        *direction = turn_right(*direction);
-    }
+        turn_right(direction)
+    } else {
+        panic!("quo vadis?");
+    };
 
-    instruction
-        .trim_matches(|c| c == 'L' || c == 'R')
-        .parse::<i32>()
-        .unwrap()
+    (
+        direction,
+        instruction
+            .trim_matches(|c| c == 'L' || c == 'R')
+            .parse::<i32>()
+            .unwrap(),
+    )
 }
 
 fn move_towards(direction: Direction, steps: i32, position: &mut (i32, i32)) {
