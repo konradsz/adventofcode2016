@@ -1,24 +1,14 @@
+#[macro_use]
+extern crate lazy_static;
+
 use regex::Regex;
 use std::fs;
-/*struct Scrambler {
-    password: String,
-}
-
-impl Scrambler {
-
-}*/
 
 fn swap_position(password: &str, position_1: usize, position_2: usize) -> String {
     let letter_1 = password.chars().nth(position_1).unwrap();
     let letter_2 = password.chars().nth(position_2).unwrap();
-    /*let mut new_password = String::with_capacity(password.len());
-    new_password.push_str(&password[0..pos_1]);
-    new_password.push(char_2);
-    new_password.push_str(&password[pos_1 + 1..pos_2]);
-    new_password.push(char_1);
-    new_password.push_str(&password[pos_2 + 1..]);*/
-    let mut new_password = String::from(password);
 
+    let mut new_password = String::from(password);
     new_password.replace_range(position_1..=position_1, &letter_2.to_string());
     new_password.replace_range(position_2..=position_2, &letter_1.to_string());
 
@@ -33,25 +23,11 @@ fn swap_letters(password: &str, letter_1: char, letter_2: char) -> String {
 }
 
 fn rotate_left(password: &str, steps: usize) -> String {
-    //String::from(&password[steps..]) + &String::from(&password[0..steps])
-    let s = steps % password.len();
-    String::from(&password[s..]) + &password[0..s]
+    String::from(&password[steps..]) + &password[0..steps]
 }
 
 fn rotate_right(password: &str, steps: usize) -> String {
-    //String::from(&password[password.len() - steps..]) + &String::from(&password[0..password.len() - steps])
-    let s = steps % password.len();
-    String::from(&password[password.len() - s..]) + &password[0..password.len() - s]
-}
-
-fn count_right_rotation(password: &str, letter: char) -> usize {
-    let position = password.find(letter).unwrap();
-
-    if position >= 4 {
-        position + 2
-    } else {
-        position + 1
-    }
+    String::from(&password[password.len() - steps..]) + &password[0..password.len() - steps]
 }
 
 fn rotate_right_based_on(password: &str, letter: char) -> String {
@@ -63,20 +39,23 @@ fn rotate_right_based_on(password: &str, letter: char) -> String {
     }
 
     new_password
-    /*let rotations = count_right_rotation(password, letter);
-    let mut new_password = String::from(password);
-    rotate_right(&new_password, rotations)*/
 }
 
 fn rotate_left_based_on(password: &str, letter: char) -> String {
     let position = password.find(letter).unwrap();
-    let mut new_password = rotate_left(password, 1);
-    new_password = rotate_left(&new_password, position);
-    if position >= 4 {
-        new_password = rotate_left(&new_password, 1);
-    }
+    let rotates = match position {
+        0 => 1,
+        1 => 1,
+        2 => 6,
+        3 => 2,
+        4 => 7,
+        5 => 3,
+        6 => 8,
+        7 => 4,
+        _ => unreachable!(),
+    };
 
-    new_password
+    rotate_left(password, rotates)
 }
 
 fn reverse(password: &str, from: usize, to: usize) -> String {
@@ -94,107 +73,105 @@ fn move_positions(password: &str, position_1: usize, position_2: usize) -> Strin
     new_password
 }
 
+fn execute(instruction: &str, password: &str, inverse: bool) -> String {
+    lazy_static! {
+        static ref SWAP_POSITION: Regex =
+            Regex::new(r"swap position (?P<p1>\d{1}) with position (?P<p2>\d{1})").unwrap();
+        static ref SWAP_LETTERS: Regex =
+            Regex::new(r"swap letter (?P<l1>\S{1}) with letter (?P<l2>\S{1})").unwrap();
+        static ref ROTATE_LEFT: Regex = Regex::new(r"rotate left (?P<steps>\d{1})").unwrap();
+        static ref ROTATE_RIGHT: Regex = Regex::new(r"rotate right (?P<steps>\d{1})").unwrap();
+        static ref ROTATE_BASED: Regex =
+            Regex::new(r"rotate based on position of letter (?P<l>\S{1})").unwrap();
+        static ref REVERSE: Regex =
+            Regex::new(r"reverse positions (?P<from>\d{1}) through (?P<to>\d{1})").unwrap();
+        static ref MOVE_POSITION: Regex =
+            Regex::new(r"move position (?P<p1>\d{1}) to position (?P<p2>\d{1})").unwrap();
+    }
+
+    if SWAP_POSITION.is_match(instruction) {
+        let caps = SWAP_POSITION.captures(instruction).unwrap();
+        swap_position(
+            &password,
+            caps["p1"].parse::<usize>().unwrap(),
+            caps["p2"].parse::<usize>().unwrap(),
+        )
+    } else if SWAP_LETTERS.is_match(instruction) {
+        let caps = SWAP_LETTERS.captures(instruction).unwrap();
+        swap_letters(
+            &password,
+            caps["l1"].chars().nth(0).unwrap(),
+            caps["l2"].chars().nth(0).unwrap(),
+        )
+    } else if ROTATE_LEFT.is_match(instruction) {
+        let caps = ROTATE_LEFT.captures(instruction).unwrap();
+        if !inverse {
+            rotate_left(&password, caps["steps"].parse::<usize>().unwrap())
+        } else {
+            rotate_right(&password, caps["steps"].parse::<usize>().unwrap())
+        }
+    } else if ROTATE_RIGHT.is_match(instruction) {
+        let caps = ROTATE_RIGHT.captures(instruction).unwrap();
+        if !inverse {
+            rotate_right(&password, caps["steps"].parse::<usize>().unwrap())
+        } else {
+            rotate_left(&password, caps["steps"].parse::<usize>().unwrap())
+        }
+    } else if ROTATE_BASED.is_match(instruction) {
+        let caps = ROTATE_BASED.captures(instruction).unwrap();
+        if !inverse {
+            rotate_right_based_on(&password, caps["l"].chars().nth(0).unwrap())
+        } else {
+            rotate_left_based_on(&password, caps["l"].chars().nth(0).unwrap())
+        }
+    } else if REVERSE.is_match(instruction) {
+        let caps = REVERSE.captures(instruction).unwrap();
+        reverse(
+            &password,
+            caps["from"].parse::<usize>().unwrap(),
+            caps["to"].parse::<usize>().unwrap(),
+        )
+    } else if MOVE_POSITION.is_match(instruction) {
+        let caps = MOVE_POSITION.captures(instruction).unwrap();
+        if !inverse {
+            move_positions(
+                &password,
+                caps["p1"].parse::<usize>().unwrap(),
+                caps["p2"].parse::<usize>().unwrap(),
+            )
+        } else {
+            move_positions(
+                &password,
+                caps["p2"].parse::<usize>().unwrap(),
+                caps["p1"].parse::<usize>().unwrap(),
+            )
+        }
+    } else {
+        panic!("unknown instruction!");
+    }
+}
+
+fn execute_instructions(input: &str, password: &str, inverse: bool) -> String {
+    let mut password = String::from(password);
+
+    if !inverse {
+        for line in input.lines() {
+            password = execute(line, &password, inverse);
+        }
+    } else {
+        for line in input.lines().rev() {
+            password = execute(line, &password, inverse);
+        }
+    }
+    password
+}
+
 fn main() {
     let input = fs::read_to_string("input").expect("file not found");
     let input = input.trim();
 
-    let swap_position_re = Regex::new(r"swap position (?P<p1>\d{1}) with position (?P<p2>\d{1})").unwrap();
-    let swap_letter_re = Regex::new(r"swap letter (?P<l1>\S{1}) with letter (?P<l2>\S{1})").unwrap();
-    let rotate_left_re = Regex::new(r"rotate left (?P<steps>\d{1})").unwrap();
-    let rotate_right_re = Regex::new(r"rotate right (?P<steps>\d{1})").unwrap();
-    let rotate_right_based_on_re = Regex::new(r"rotate based on position of letter (?P<l>\S{1})").unwrap();
-    let reverse_re = Regex::new(r"reverse positions (?P<from>\d{1}) through (?P<to>\d{1})").unwrap();
-    let move_positions_re = Regex::new(r"move position (?P<p1>\d{1}) to position (?P<p2>\d{1})").unwrap();
-
-    let mut password = String::from("abcdefgh");
-    for line in input.lines() {
-        if swap_position_re.is_match(line) {
-            let caps = swap_position_re.captures(line).unwrap();
-            password = swap_position(&password, caps["p1"].parse::<usize>().unwrap(),caps["p2"].parse::<usize>().unwrap());
-        } else if swap_letter_re.is_match(line) {
-            let caps = swap_letter_re.captures(line).unwrap();
-            password = swap_letters(&password, caps["l1"].chars().nth(0).unwrap(), caps["l2"].chars().nth(0).unwrap());
-        } else if rotate_left_re.is_match(line) {
-            let caps = rotate_left_re.captures(line).unwrap();
-            password = rotate_left(&password, caps["steps"].parse::<usize>().unwrap());
-        } else if rotate_right_re.is_match(line) {
-            let caps = rotate_right_re.captures(line).unwrap();
-            password = rotate_right(&password, caps["steps"].parse::<usize>().unwrap());
-        } else if rotate_right_based_on_re.is_match(line) {
-            let caps = rotate_right_based_on_re.captures(line).unwrap();
-            password = rotate_right_based_on(&password, caps["l"].chars().nth(0).unwrap());
-        } else if reverse_re.is_match(line) {
-            let caps = reverse_re.captures(line).unwrap();
-            password = reverse(&password, caps["from"].parse::<usize>().unwrap(), caps["to"].parse::<usize>().unwrap());
-        } else if move_positions_re.is_match(line) {
-            let caps = move_positions_re.captures(line).unwrap();
-            password = move_positions(&password, caps["p1"].parse::<usize>().unwrap(), caps["p2"].parse::<usize>().unwrap());
-        }
-    }
-
-    println!("{}", password);
-
-    /*let input = fs::read_to_string("input").expect("file not found");
-    let input = input.trim();
-
-    let swap_position_re = Regex::new(r"swap position (?P<p1>\d{1}) with position (?P<p2>\d{1})").unwrap();
-    let swap_letter_re = Regex::new(r"swap letter (?P<l1>\S{1}) with letter (?P<l2>\S{1})").unwrap();
-    let rotate_left_re = Regex::new(r"rotate left (?P<steps>\d{1})").unwrap();
-    let rotate_right_re = Regex::new(r"rotate right (?P<steps>\d{1})").unwrap();
-    let rotate_right_based_on_re = Regex::new(r"rotate based on position of letter (?P<l>\S{1})").unwrap();
-    let reverse_re = Regex::new(r"reverse positions (?P<from>\d{1}) through (?P<to>\d{1})").unwrap();
-    let move_positions_re = Regex::new(r"move position (?P<p1>\d{1}) to position (?P<p2>\d{1})").unwrap();
-
-    let mut password = String::from("decab");
-    for line in input.lines().rev() {
-        if swap_position_re.is_match(line) {
-            let caps = swap_position_re.captures(line).unwrap();
-            password = swap_position(&password, caps["p1"].parse::<usize>().unwrap(),caps["p2"].parse::<usize>().unwrap());
-        } else if swap_letter_re.is_match(line) {
-            let caps = swap_letter_re.captures(line).unwrap();
-            password = swap_letters(&password, caps["l1"].chars().nth(0).unwrap(), caps["l2"].chars().nth(0).unwrap());
-        } else if rotate_left_re.is_match(line) {
-            let caps = rotate_left_re.captures(line).unwrap();
-            password = rotate_right(&password, caps["steps"].parse::<usize>().unwrap());
-        } else if rotate_right_re.is_match(line) {
-            let caps = rotate_right_re.captures(line).unwrap();
-            password = rotate_left(&password, caps["steps"].parse::<usize>().unwrap());
-        } else if rotate_right_based_on_re.is_match(line) {
-            let caps = rotate_right_based_on_re.captures(line).unwrap();
-            let count = count_right_rotation(&password, caps["l"].chars().nth(0).unwrap());
-            if count < 5 {
-                password = rotate_left(&password, count - 2);
-
-            } else {
-                password = rotate_left(&password, count - 1);
-            }
-        } else if reverse_re.is_match(line) {
-            let caps = reverse_re.captures(line).unwrap();
-            password = reverse(&password, caps["from"].parse::<usize>().unwrap(), caps["to"].parse::<usize>().unwrap());
-        } else if move_positions_re.is_match(line) {
-            let caps = move_positions_re.captures(line).unwrap();
-            password = move_positions(&password, caps["p2"].parse::<usize>().unwrap(), caps["p1"].parse::<usize>().unwrap());
-        }
-    }
-
-    println!("{}", password);*/
-
-    /*let p = rotate_right_based_on("axxxxxxx", 'a');
-    println!("{}",p);
-    let p = rotate_right_based_on("xaxxxxxx", 'a');
-    println!("{}",p);
-    let p = rotate_right_based_on("xxaxxxxx", 'a');
-    println!("{}",p);
-    let p = rotate_right_based_on("xxxaxxxx", 'a');
-    println!("{}",p);
-    let p = rotate_right_based_on("xxxxaxxx", 'a');
-    println!("{}",p);
-    let p = rotate_right_based_on("xxxxxaxx", 'a');
-    println!("{}",p);
-    let p = rotate_right_based_on("xxxxxxax", 'a');
-    println!("{}",p);
-    let p = rotate_right_based_on("xxxxxxxa", 'a');
-    println!("{}",p);*/
+    assert_eq!("baecdfgh", execute_instructions(input, "abcdefgh", false));
+    assert_eq!("cegdahbf", execute_instructions(input, "fbgdceah", true));
 }
 
 #[cfg(test)]
