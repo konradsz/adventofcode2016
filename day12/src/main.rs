@@ -34,19 +34,14 @@ impl Computer {
                 break;
             }
 
-            let instruction = self.program[self.pc as usize].clone();
+            let instruction = self.program[self.pc as usize].as_str();
             let mut parts = instruction.split(' ');
 
             match parts.next().unwrap() {
                 "cpy" => {
-                    let value = parts.next().unwrap();
+                    let value = self.get_immediate_or_from_register(parts.next().unwrap());
                     let register = Computer::parse_register(parts.next().unwrap());
-                    if value.parse::<i32>().is_ok() {
-                        self.cpy_value(value.parse::<i32>().unwrap(), register);
-                    } else {
-                        let value = self.get_register(Computer::parse_register(value));
-                        self.cpy_value(value, register);
-                    }
+                    self.cpy_value(value, register);
                 }
                 "inc" => {
                     let register = Computer::parse_register(parts.next().unwrap());
@@ -57,18 +52,19 @@ impl Computer {
                     self.dec(register);
                 }
                 "jnz" => {
-                    let value = parts.next().unwrap();
+                    let value = self.get_immediate_or_from_register(parts.next().unwrap());
                     let offset = parts.next().unwrap().parse::<i32>().unwrap();
-                    if value.parse::<i32>().is_ok() {
-                        self.jnz(value.parse::<i32>().unwrap(), offset);
-                    } else {
-                        let value = self.get_register(Computer::parse_register(value));
-                        self.jnz(value, offset);
-                    }
+                    self.jnz(value, offset);
                 }
                 _ => panic!("unknown instruction"),
             }
         }
+    }
+
+    fn get_immediate_or_from_register(&self, value: &str) -> i32 {
+        value
+            .parse::<i32>()
+            .unwrap_or_else(|_| self.get_register(Computer::parse_register(value)))
     }
 
     fn cpy_value(&mut self, value: i32, destination: Register) {
